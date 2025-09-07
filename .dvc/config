@@ -1,2 +1,4 @@
+[core]
+    remote = datastore
 ['remote "datastore"']
     url = /home/sh99/Codespace/ml-experimentation/datastore
