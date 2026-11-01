@@ -1,5 +1,4 @@
 _target_: pipeline.data.featurize.PropertyFeatureEngineer
-target_column: price
 size_column: size_sqft
 bedrooms_column: num_bedrooms
 bathrooms_column: num_bathrooms

@@ -1,85 +1,126 @@
 from argparse import ArgumentParser
 from pathlib import Path
-
-import joblib
+import numpy as np
 import pandas as pd
-from pipeline.data.features import PropertyFeatureEngineer
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.utils.validation import check_is_fitted
+from omegaconf import OmegaConf
+from hydra.utils import instantiate
+import joblib
 
 
-def featurize_frame(frame: pd.DataFrame, target_column: str = "price") -> pd.DataFrame:
-    """Add property features while keeping the target separate from transformer inputs."""
-    if target_column not in frame.columns:
-        raise ValueError(f"Missing target column: {target_column}")
+class PropertyFeatureEngineer(TransformerMixin, BaseEstimator):
+	"""Create property features from a pandas feature matrix."""
 
-    X = frame.drop(columns=[target_column])
-    transformer = PropertyFeatureEngineer(target_column=target_column)
-    featured = transformer.fit_transform(X)
-    featured[target_column] = frame[target_column]
-    return featured
+	def __init__(
+		self,
+		size_column: str = "size_sqft",
+		bedrooms_column: str = "num_bedrooms",
+		bathrooms_column: str = "num_bathrooms",
+		floor_column: str = "floor_number",
+		total_floors_column: str = "total_floors",
+		amenity_prefix: str = "amenities_",
+	):
+		self.size_column = size_column
+		self.bedrooms_column = bedrooms_column
+		self.bathrooms_column = bathrooms_column
+		self.floor_column = floor_column
+		self.total_floors_column = total_floors_column
+		self.amenity_prefix = amenity_prefix
+
+	def fit(self, X: pd.DataFrame, y: pd.Series | None = None) -> "PropertyFeatureEngineer":
+		if not isinstance(X, pd.DataFrame):
+			raise TypeError("PropertyFeatureEngineer requires a pandas DataFrame.")
+
+		required_columns = {
+			self.size_column,
+			self.bedrooms_column,
+			self.bathrooms_column,
+			self.floor_column,
+			self.total_floors_column,
+		}
+		missing_columns = required_columns.difference(X.columns)
+		if missing_columns:
+			raise ValueError(f"Missing required columns: {', '.join(sorted(missing_columns))}")
+
+		self.amenity_columns_ = [
+			column for column in X.columns if column.startswith(self.amenity_prefix)
+		]
+		if not self.amenity_columns_:
+			raise ValueError(
+				f"Expected at least one amenity column with the {self.amenity_prefix!r} prefix."
+			)
+
+		self.feature_names_in_ = np.asarray(X.columns, dtype=object)
+		self.n_features_in_ = len(self.feature_names_in_)
+		return self
+
+	def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+		check_is_fitted(self, ["amenity_columns_", "feature_names_in_"])
+		if not isinstance(X, pd.DataFrame):
+			raise TypeError("PropertyFeatureEngineer requires a pandas DataFrame.")
+
+		required_columns = {
+			self.size_column,
+			self.bedrooms_column,
+			self.bathrooms_column,
+			self.floor_column,
+			self.total_floors_column,
+		}
+		missing_required = required_columns.difference(X.columns)
+		if missing_required:
+			raise ValueError(f"Missing required columns: {', '.join(sorted(missing_required))}")
+
+		featured = X.reindex(columns=self.feature_names_in_, fill_value=0).copy()
+		featured["size_sqft_per_bedroom"] = featured[self.size_column].div(
+			featured[self.bedrooms_column]
+		).where(featured[self.bedrooms_column].ne(0), 0)
+		featured["bathrooms_per_bedroom"] = featured[self.bathrooms_column].div(
+			featured[self.bedrooms_column]
+		).where(featured[self.bedrooms_column].ne(0), 0)
+		featured["floor_ratio"] = featured[self.floor_column].div(
+			featured[self.total_floors_column]
+		).where(featured[self.total_floors_column].ne(0), 0)
+		featured["amenity_count"] = featured[self.amenity_columns_].sum(axis=1)
+		return featured
+
+	def get_feature_names_out(self, input_features: list[str] | None = None) -> np.ndarray:
+		check_is_fitted(self, ["amenity_columns_", "feature_names_in_"])
+		if input_features is not None and list(input_features) != list(self.feature_names_in_):
+			raise ValueError("input_features must match the columns seen during fit.")
+		generated = [
+			"size_sqft_per_bedroom",
+			"bathrooms_per_bedroom",
+			"floor_ratio",
+			"amenity_count",
+		]
+		names = [name for name in self.feature_names_in_ if name not in generated]
+		return np.asarray([*names, *generated], dtype=object)
 
 
-def featurize_directory(
-    input_dir: Path,
-    output_dir: Path,
-    target_column: str = "price",
-    size_column: str = "size_sqft",
-    bedrooms_column: str = "num_bedrooms",
-    bathrooms_column: str = "num_bathrooms",
-    floor_column: str = "floor_number",
-    total_floors_column: str = "total_floors",
-    amenity_prefix: str = "amenities_",
-) -> None:
-    """Transform train.csv and test.csv from a prepared-data directory."""
+def main():
+	parser = ArgumentParser(description="Test the PropertyFeatureEngineer.")
+	parser.add_argument("--input-csv", type=Path, required=True, help="Input CSV file.")
+	parser.add_argument("--output-dir", type=Path, required=True, help="Output CSV file.")
+	parser.add_argument("--target-column", default="price", help="Target column retained outside preprocessing.")
+	parser.add_argument("--size-column", default="size_sqft", help="Column name for property size.")
+	parser.add_argument("--bedrooms-column", default="num_bedrooms", help="Column name for number of bedrooms.")
+	parser.add_argument("--bathrooms-column", default="num_bathrooms", help="Column name for number of bathrooms.")
+	parser.add_argument("--floor-column", default="floor_number", help="Column name for floor number.")
+	parser.add_argument("--total-floors-column", default="total_floors", help="Column name for total floors.")
+	parser.add_argument("--amenity-prefix", default="amenities_", help="Prefix for amenity columns.")
+	parser.add_argument("--config", type=Path, default="configs/featurizer.yaml", help="Path to the configuration YAML file.")
+	args = parser.parse_args()
 
-    input_path = Path(input_dir) / "train.csv"
-
-    if not input_path.is_file():
-        raise FileNotFoundError(f"Expected prepared split at {input_path}")
-
-    train_frame = pd.read_csv(input_path)
-    if target_column not in train_frame:
-        raise ValueError(f"Target column '{target_column}' not found in train data.")
-
-    transformer = PropertyFeatureEngineer(
-        target_column=target_column,
-        size_column=size_column,
-        bedrooms_column=bedrooms_column,
-        bathrooms_column=bathrooms_column,
-        floor_column=floor_column,
-        total_floors_column=total_floors_column,
-        amenity_prefix=amenity_prefix,
-    )
-    featured = transformer.fit_transform(train_frame.drop(columns=[target_column]))
-    output_dir.mkdir(parents=True, exist_ok=True)
-    joblib.dump(transformer, output_dir / "featurizer.joblib")
-    featured[target_column] = train_frame[target_column]
-    featured.to_csv(output_dir / "features.csv", index=False)
-
-
-def main() -> None:
-    parser = ArgumentParser(description="Add property features to prepared train/test CSVs.")
-    parser.add_argument("--input-dir", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--target-column", default="price")
-    parser.add_argument("--size-column", default="size_sqft")
-    parser.add_argument("--bedrooms-column", default="num_bedrooms")
-    parser.add_argument("--bathrooms-column", default="num_bathrooms")
-    parser.add_argument("--floor-column", default="floor_number")
-    parser.add_argument("--total-floors-column", default="total_floors")
-    parser.add_argument("--amenity-prefix", default="amenities_")
-    args = parser.parse_args()
-    featurize_directory(
-        args.input_dir,
-        args.output_dir,
-        args.target_column,
-        args.size_column,
-        args.bedrooms_column,
-        args.bathrooms_column,
-        args.floor_column,
-        args.total_floors_column,
-        args.amenity_prefix,
-    )
-
-
-if __name__ == "__main__":
-    main()
+	cfg = OmegaConf.load(args.config)
+	ft_inputs = ['size_column', 'bedrooms_column', 'bathrooms_column', 'floor_column', 'total_floors_column', 'amenity_prefix']
+	for key in ft_inputs:
+		if cfg.get(key) is None and getattr(args, key) is not None:
+			cfg[key] = getattr(args, key)
+	fe = instantiate(cfg)
+	df = pd.read_csv(args.input_csv)
+	y = df.pop(args.target_column)
+	df = fe.fit_transform(df)
+	df[args.target_column] = y
+	df.to_csv(args.output_dir / "features.csv", index=False)
+	joblib.dump(fe, args.output_dir / "featurizer.joblib")
