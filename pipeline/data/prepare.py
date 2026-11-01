@@ -28,7 +28,7 @@ def load_data(path: Path) -> pd.DataFrame:
 def prepare_data(df: pd.DataFrame) -> pd.DataFrame:
     """Prepare the data for modeling."""
     # Normalize column names
-    trf = instantiate(OmegaConf.load("configs/preprocess.yaml"))
+    trf = instantiate(OmegaConf.load("configs/preprocess.yaml"), _convert_="all")
     trf.set_output(transform='pandas')
     df = trf.fit_transform(df)
     df.columns = [normalize_name(c) for c in df.columns]

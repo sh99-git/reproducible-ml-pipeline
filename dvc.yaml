@@ -1,0 +1,23 @@
+vars:
+  - configs/params.yaml
+
+stages:
+  prepare:
+    cmd: uv run python -m pipeline.data.prepare --input-dir ${input-path} 
+      --output-dir ${prepare.output} --random-state ${prepare.random-state} 
+      --test-size ${prepare.test-size} --target-column ${target-column}
+    deps:
+    - data/raw
+    - pipeline/data/prepare.py
+    - configs/preprocess.yaml
+    params:
+    - configs/params.yaml:
+      - input-path
+      - prepare.random-state
+      - prepare.test-size
+      - prepare.output
+      - target-column
+    outs:
+    - ${prepare.output}/train.csv
+    - ${prepare.output}/test.csv
+    - ${prepare.output}/preprocessor.joblib

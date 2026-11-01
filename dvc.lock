@@ -1,0 +1,40 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: uv run python -m pipeline.data.prepare --input-dir data/raw 
+      --output-dir data/processed --random-state 42 --test-size 0.2 
+      --target-column price
+    deps:
+    - path: configs/preprocess.yaml
+      hash: md5
+      md5: ae802f1de376c3b0815399b0117d7cc6
+      size: 643
+    - path: data/raw
+      hash: md5
+      md5: 9ee711bbde15648ef9ad1b785707bb90.dir
+      size: 165799
+      nfiles: 1
+    - path: pipeline/data/prepare.py
+      hash: md5
+      md5: fb526d10fb0402b7d6cf724e45743c06
+      size: 2625
+    params:
+      configs/params.yaml:
+        input-path: data/raw
+        prepare.output: data/processed
+        prepare.random-state: 42
+        prepare.test-size: 0.2
+        target-column: price
+    outs:
+    - path: data/processed/preprocessor.joblib
+      hash: md5
+      md5: 95242751deb265ee898924f13829cf43
+      size: 5425
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 6be975faad0d2a962faac8678f91b67c
+      size: 27717
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 29b1cf9d7c38943addffca92abff29a9
+      size: 109662
