@@ -1,0 +1,25 @@
+_target_: sklearn.compose.ColumnTransformer
+transformers:
+  - - onehot
+    - _target_: sklearn.preprocessing.OneHotEncoder
+      handle_unknown: ignore
+      sparse_output: false
+    - - property_type
+      - location
+  - - ordinal
+    - _target_: sklearn.preprocessing.OrdinalEncoder
+      categories: 
+        - - Unfurnished
+          - Semi-Furnished
+          - Fully Furnished
+    - - furnishing
+  - - multilabel
+    - _target_: skext.multilabels.MultiLabelBinarizerTransformer
+      delimiter: ","
+    - - amenities
+  - - coldrop
+    - drop
+    - - property_id
+      - date_listed
+verbose_feature_names_out: false
+remainder: passthrough

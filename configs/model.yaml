@@ -1,0 +1,20 @@
+_target_: sklearn.pipeline.Pipeline
+steps:
+  - - scaler
+    - _target_: sklearn.compose.ColumnTransformer
+      transformers:
+        - - num
+          - _target_: sklearn.preprocessing.StandardScaler
+            with_mean: true
+            with_std: true
+          - - size_sqft
+            - num_bedrooms
+            - num_bathrooms
+      remainder: passthrough
+  - - estimator
+    - _target_: sklearn.ensemble.RandomForestRegressor
+      n_estimators: 200
+      max_depth: null
+      min_samples_leaf: 1
+      n_jobs: -1
+      random_state: 43
