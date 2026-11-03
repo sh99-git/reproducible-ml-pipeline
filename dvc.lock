@@ -16,8 +16,8 @@ stages:
       nfiles: 1
     - path: pipeline/data/prepare.py
       hash: md5
-      md5: 215a14d33b1af2d937fff9ce8781bdef
-      size: 2434
+      md5: bc222145e9a24e7e87165aebcc16e378
+      size: 3105
     params:
       configs/params.yaml:
         prepare.output: data/processed
@@ -51,5 +51,14 @@ stages:
       size: 109669
     - path: pipeline/data/featurize.py
       hash: md5
-      md5: 58f5267a6259e2e6e9cb60989c1e8353
-      size: 5291
+      md5: 6796807fb236a9d84a550544eb1a0b77
+      size: 5113
+    outs:
+    - path: data/features/features.csv
+      hash: md5
+      md5: 95a50ddd680635fd1336395b4a8a52b4
+      size: 148382
+    - path: data/features/featurizer.joblib
+      hash: md5
+      md5: 6f52d78ac93378da7e2153929f78a97e
+      size: 1319

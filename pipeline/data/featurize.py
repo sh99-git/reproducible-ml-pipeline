@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+import logging
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -7,6 +8,8 @@ from sklearn.utils.validation import check_is_fitted
 from omegaconf import OmegaConf
 from hydra.utils import instantiate
 import joblib
+
+logger = logging.getLogger(__name__)
 
 
 class PropertyFeatureEngineer(TransformerMixin, BaseEstimator):
@@ -101,26 +104,28 @@ class PropertyFeatureEngineer(TransformerMixin, BaseEstimator):
 def main():
 	parser = ArgumentParser(description="Test the PropertyFeatureEngineer.")
 	parser.add_argument("--input-csv", type=Path, required=True, help="Input CSV file.")
-	parser.add_argument("--output-dir", type=Path, required=True, help="Output CSV file.")
+	parser.add_argument("--output-dir", type=Path, required=True, help="Output directory.")
 	parser.add_argument("--target-column", default="price", help="Target column retained outside preprocessing.")
-	parser.add_argument("--size-column", default="size_sqft", help="Column name for property size.")
-	parser.add_argument("--bedrooms-column", default="num_bedrooms", help="Column name for number of bedrooms.")
-	parser.add_argument("--bathrooms-column", default="num_bathrooms", help="Column name for number of bathrooms.")
-	parser.add_argument("--floor-column", default="floor_number", help="Column name for floor number.")
-	parser.add_argument("--total-floors-column", default="total_floors", help="Column name for total floors.")
-	parser.add_argument("--amenity-prefix", default="amenities_", help="Prefix for amenity columns.")
 	parser.add_argument("--config", type=Path, default="configs/featurizer.yaml", help="Path to the configuration YAML file.")
 	args = parser.parse_args()
 
+	logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+	logger.info("Loading featurizer configuration from %s", args.config)
 	cfg = OmegaConf.load(args.config)
-	ft_inputs = ['size_column', 'bedrooms_column', 'bathrooms_column', 'floor_column', 'total_floors_column', 'amenity_prefix']
-	for key in ft_inputs:
-		if cfg.get(key) is None and getattr(args, key) is not None:
-			cfg[key] = getattr(args, key)
 	fe = instantiate(cfg)
+	logger.info("Reading input data from %s", args.input_csv)
 	df = pd.read_csv(args.input_csv)
+	if args.target_column not in df.columns:
+		raise ValueError(f"Target column {args.target_column!r} is missing from {args.input_csv}.")
 	y = df.pop(args.target_column)
+	logger.info("Fitting featurizer on %d rows and %d input columns", len(df), len(df.columns))
 	df = fe.fit_transform(df)
 	df[args.target_column] = y
+	args.output_dir.mkdir(parents=True, exist_ok=True)
 	df.to_csv(args.output_dir / "features.csv", index=False)
 	joblib.dump(fe, args.output_dir / "featurizer.joblib")
+	logger.info("Wrote %d rows and %d columns to %s", len(df), len(df.columns), args.output_dir)
+
+
+if __name__ == "__main__":
+	main()
