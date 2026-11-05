@@ -16,8 +16,12 @@ stages:
       nfiles: 1
     - path: pipeline/data/prepare.py
       hash: md5
-      md5: bc222145e9a24e7e87165aebcc16e378
-      size: 3105
+      md5: bcedbaa6ac0fb58f044f1752762c0d9a
+      size: 3766
+    - path: pipeline/data/utils.py
+      hash: md5
+      md5: e48bea05d659b83b08f731ca29a5bb72
+      size: 1467
     params:
       configs/params.yaml:
         prepare.output: data/processed
@@ -39,7 +43,8 @@ stages:
   featurize:
     cmd: uv run python -m pipeline.data.featurize --input-csv 
       data/processed/train.csv --output-dir data/features --config 
-      configs/featurizer.yaml --target-column price
+      configs/featurizer.yaml --target-column price --noise-level 0.1 
+      --noise-type gaussian --noise-state 57 --noise-fraction 0.25
     deps:
     - path: configs/featurizer.yaml
       hash: md5
@@ -51,14 +56,149 @@ stages:
       size: 109669
     - path: pipeline/data/featurize.py
       hash: md5
-      md5: 6796807fb236a9d84a550544eb1a0b77
-      size: 5113
+      md5: b3a1f73fb11f20c7ade39a42d2ec9bfb
+      size: 8543
+    - path: pipeline/data/utils.py
+      hash: md5
+      md5: e48bea05d659b83b08f731ca29a5bb72
+      size: 1467
+    params:
+      configs/params.yaml:
+        featurize.noise-fraction: 0.25
+        featurize.noise-level: 0.1
+        featurize.noise-state: 57
+        featurize.noise-type: gaussian
     outs:
     - path: data/features/features.csv
       hash: md5
-      md5: 95a50ddd680635fd1336395b4a8a52b4
-      size: 148382
+      md5: 6b1e2dc17575e62609489dfd278d333e
+      size: 212733
     - path: data/features/featurizer.joblib
       hash: md5
       md5: 6f52d78ac93378da7e2153929f78a97e
       size: 1319
+  train:
+    cmd: uv run python -m pipeline.model.train --input-csv 
+      data/features/features.csv --preprocessor-path 
+      data/processed/preprocessor.joblib --featurizer-path 
+      data/features/featurizer.joblib --output-dir models --config 
+      configs/model.yaml --target-column price --experiment-name 
+      property-price-models --cv-type kfold --cv-splits 5 --cv-repeats 1 
+      --cv-random-state 37
+    deps:
+    - path: configs/model.yaml
+      hash: md5
+      md5: 126e8f0c21b6a75ff28741df023a10b4
+      size: 546
+    - path: data/features/features.csv
+      hash: md5
+      md5: 6b1e2dc17575e62609489dfd278d333e
+      size: 212733
+    - path: data/features/featurizer.joblib
+      hash: md5
+      md5: 6f52d78ac93378da7e2153929f78a97e
+      size: 1319
+    - path: data/processed/preprocessor.joblib
+      hash: md5
+      md5: 5e420e63061c8a41b32f818a7e53aa2e
+      size: 5391
+    - path: pipeline/data/utils.py
+      hash: md5
+      md5: e48bea05d659b83b08f731ca29a5bb72
+      size: 1467
+    - path: pipeline/model/train.py
+      hash: md5
+      md5: 9ea65fc5b7766326bb949df02a9df73f
+      size: 10655
+    - path: pipeline/model/utils.py
+      hash: md5
+      md5: 2b7691220ae6d3cbe0719b8719a4c345
+      size: 1759
+    params:
+      configs/params.yaml:
+        experiment-name: property-price-models
+        train.cv-random-state: 37
+        train.cv-repeats: 1
+        train.cv-splits: 5
+        train.cv-type: kfold
+    outs:
+    - path: models/cv_metrics.csv
+      hash: md5
+      md5: c8d3a570147484409cbb83523f0a338c
+      size: 834
+    - path: models/cv_predictions.csv
+      hash: md5
+      md5: ff60dcf940d1e184ff086b966fe05e57
+      size: 38749
+    - path: models/dvclive
+      hash: md5
+      md5: e7ab242f8c66fc6aa960623b2e127d38.dir
+      size: 560380
+      nfiles: 23
+    - path: models/metrics.json
+      hash: md5
+      md5: 942e6213f26c0e48d7eebb3b122a3c55
+      size: 794
+    - path: models/model.joblib
+      hash: md5
+      md5: a6b2182f3274b2ea339eadc15469bf76
+      size: 21912497
+    - path: models/plots
+      hash: md5
+      md5: 15b39715b1b80bb0649f4d4ba4803c27.dir
+      size: 261621
+      nfiles: 3
+  evaluate:
+    cmd: uv run python -m pipeline.model.evaluate --input-csv 
+      data/processed/test.csv --model-path models/model.joblib --output-dir 
+      reports/evaluation --target-column price --experiment-name 
+      property-price-models
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 1caaea29bd2f45015139a09d74e6e3bd
+      size: 33311
+    - path: models/model.joblib
+      hash: md5
+      md5: a6b2182f3274b2ea339eadc15469bf76
+      size: 21912497
+    - path: pipeline/data/utils.py
+      hash: md5
+      md5: e48bea05d659b83b08f731ca29a5bb72
+      size: 1467
+    - path: pipeline/model/evaluate.py
+      hash: md5
+      md5: 6ce9df3815307ec6055383aa0fe28c1e
+      size: 12988
+    - path: pipeline/model/utils.py
+      hash: md5
+      md5: 2b7691220ae6d3cbe0719b8719a4c345
+      size: 1759
+    params:
+      configs/params.yaml:
+        evaluate.output: reports/evaluation
+        experiment-name: property-price-models
+        target-column: price
+    outs:
+    - path: reports/evaluation/dvclive
+      hash: md5
+      md5: da0a2d3fe8236c4781fa1a77fa5869c1.dir
+      size: 718795
+      nfiles: 17
+    - path: reports/evaluation/evaluation_metrics.json
+      hash: md5
+      md5: 7b2630483aec6357b0481a6d311a550c
+      size: 227
+    - path: reports/evaluation/evaluation_report.html
+      hash: md5
+      md5: 353eaf1eab4850f0be68f938042cf87b
+      size: 848901
+    - path: reports/evaluation/plots
+      hash: md5
+      md5: 70e2fa8ce0f8f5f2bcb656c9b9966a3d.dir
+      size: 634448
+      nfiles: 7
+    - path: reports/evaluation/predictions.csv
+      hash: md5
+      md5: da406114bb26cfdb61a35b94e0fdd8be
+      size: 12019

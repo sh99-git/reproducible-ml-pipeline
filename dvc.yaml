@@ -1,14 +1,16 @@
 vars:
-  - configs/params.yaml
+- configs/params.yaml
 
 stages:
   prepare:
     cmd: uv run python -m pipeline.data.prepare --input-dir ${input-path} 
       --output-dir ${prepare.output} --random-state ${prepare.random-state} 
-      --test-size ${prepare.test-size} --target-column ${target-column} --config ${prepare.config}
+      --test-size ${prepare.test-size} --target-column ${target-column} --config
+      ${prepare.config}
     deps:
     - ${input-path}
     - pipeline/data/prepare.py
+    - pipeline/data/utils.py
     - ${prepare.config}
     params:
     - configs/params.yaml:
@@ -21,11 +23,85 @@ stages:
     - ${prepare.output}/preprocessor.joblib
 
   featurize:
-    cmd: uv run python -m pipeline.data.featurize --input-csv ${prepare.output}/train.csv --output-dir ${featurize.output} --config ${featurize.config} --target-column ${target-column}
+    cmd: >-
+      uv run python -m pipeline.data.featurize --input-csv
+      ${prepare.output}/train.csv --output-dir ${featurize.output} --config
+      ${featurize.config} --target-column ${target-column} --noise-level
+      ${featurize.noise-level} --noise-type ${featurize.noise-type}
+      --noise-state ${featurize.noise-state} --noise-fraction
+      ${featurize.noise-fraction}
     deps:
     - ${prepare.output}/train.csv
     - ${featurize.config}
     - pipeline/data/featurize.py
+    - pipeline/data/utils.py
+    params:
+    - configs/params.yaml:
+      - featurize.noise-level
+      - featurize.noise-type
+      - featurize.noise-state
+      - featurize.noise-fraction
     outs:
     - ${featurize.output}/features.csv
     - ${featurize.output}/featurizer.joblib
+
+  train:
+    cmd: >-
+      uv run python -m pipeline.model.train --input-csv
+      ${featurize.output}/features.csv --preprocessor-path
+      ${prepare.output}/preprocessor.joblib --featurizer-path
+      ${featurize.output}/featurizer.joblib --output-dir ${train.output}
+      --config ${train.config} --target-column ${target-column}
+      --experiment-name ${experiment-name} --cv-type ${train.cv-type}
+      --cv-splits ${train.cv-splits} --cv-repeats ${train.cv-repeats}
+      --cv-random-state ${train.cv-random-state}
+    deps:
+    - ${featurize.output}/features.csv
+    - ${prepare.output}/preprocessor.joblib
+    - ${featurize.output}/featurizer.joblib
+    - ${train.config}
+    - pipeline/model/train.py
+    - pipeline/model/utils.py
+    - pipeline/data/utils.py
+    params:
+    - configs/params.yaml:
+      - train.cv-type
+      - train.cv-splits
+      - train.cv-repeats
+      - train.cv-random-state
+      - experiment-name
+    outs:
+    - ${train.output}/model.joblib
+    - ${train.output}/plots
+    - ${train.output}/dvclive
+    metrics:
+    - ${train.output}/metrics.json
+    plots:
+    - ${train.output}/cv_metrics.csv
+    - ${train.output}/cv_predictions.csv
+
+  evaluate:
+    cmd: >-
+      uv run python -m pipeline.model.evaluate --input-csv
+      ${prepare.output}/test.csv --model-path ${train.output}/model.joblib
+      --output-dir ${evaluate.output} --target-column ${target-column}
+      --experiment-name ${experiment-name}
+    deps:
+    - ${prepare.output}/test.csv
+    - ${train.output}/model.joblib
+    - pipeline/model/evaluate.py
+    - pipeline/model/utils.py
+    - pipeline/data/utils.py
+    params:
+    - configs/params.yaml:
+      - target-column
+      - experiment-name
+      - evaluate.output
+    outs:
+    - ${evaluate.output}/evaluation_report.html
+    - ${evaluate.output}/plots
+    - ${evaluate.output}/dvclive
+    metrics:
+    - ${evaluate.output}/evaluation_metrics.json
+    plots:
+    - ${evaluate.output}/predictions.csv
