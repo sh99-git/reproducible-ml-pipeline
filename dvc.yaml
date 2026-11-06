@@ -105,3 +105,10 @@ stages:
     - ${evaluate.output}/evaluation_metrics.json
     plots:
     - ${evaluate.output}/predictions.csv
+
+plots:
+- actual vs predicted:
+    template: scatter
+    x: actual
+    y:
+      reports/evaluation/dvclive/plots/custom/holdout_predictions.json: predicted
