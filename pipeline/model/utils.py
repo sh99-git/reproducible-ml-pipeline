@@ -1,6 +1,7 @@
 """Shared helpers for model training and evaluation stages."""
 
 import json
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -12,6 +13,7 @@ from matplotlib.figure import Figure
 import mlflow
 import numpy as np
 import pandas as pd
+import yaml
 from dvclive import Live
 
 
@@ -69,6 +71,43 @@ def save_run_identity(path: Path, run_identity: dict[str, str], run_id: str) -> 
 def load_run_identity(path: Path) -> dict[str, str]:
     """Load the parent run metadata created by the training stage."""
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def flatten_params(params: dict, prefix: str = "") -> dict[str, str]:
+    """Flatten params.yaml for MLflow, omitting configured output directories."""
+    flattened: dict[str, str] = {}
+    for key, value in params.items():
+        if key == "output":
+            continue
+        name = f"{prefix}.{key}" if prefix else str(key)
+        if isinstance(value, dict):
+            flattened.update(flatten_params(value, name))
+        else:
+            flattened[name] = str(value)
+    return flattened
+
+
+def log_pipeline_configuration(params_path: Path) -> dict[str, str]:
+    """Log shared pipeline params, config files, and their DVC-compatible MD5s."""
+    params_path = params_path.resolve()
+    params = yaml.safe_load(params_path.read_text(encoding="utf-8"))
+    mlflow.log_params(flatten_params(params))
+    mlflow.log_artifact(str(params_path), artifact_path="configuration")
+
+    hashes: dict[str, str] = {}
+    for stage in ("prepare", "featurize", "train"):
+        config_value = params.get(stage, {}).get("config")
+        if not config_value:
+            continue
+        config_path = (params_path.parent.parent / config_value).resolve()
+        if not config_path.is_file():
+            raise FileNotFoundError(f"Configuration file for {stage} not found: {config_path}")
+        digest = hashlib.md5(config_path.read_bytes()).hexdigest()
+        hashes[f"dvc_md5.{stage}_config"] = digest
+        mlflow.log_artifact(str(config_path), artifact_path=f"configuration/{stage}")
+
+    mlflow.log_params(hashes)
+    return hashes
 
 
 def save_figure(

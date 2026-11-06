@@ -32,6 +32,8 @@ Change these files before running DVC so stage parameters and dependencies are r
 
 `experiment-name` in `configs/params.yaml` is the MLflow experiment and run-name base. Each training invocation creates a parent run named `<base>-training-<timestamp>-<id>`. Cross-validation runs are nested children named with the same parent identity and a `-cv-N` suffix. The training stage saves the parent run ID and naming metadata to `models/run_info.json`; evaluation resumes that run and adds holdout metrics and report artifacts to the parent.
 
+Every parent and CV child logs the flattened values from `configs/params.yaml`, excluding stage `output` directories. Runs also include the `params.yaml` and stage YAML files as MLflow artifacts, plus `dvc_md5.*_config` params matching DVC's hashes for the preprocessing, featurizer, and model configs.
+
 DVCLive does not use MLflow-style nested runs here. With the configured five folds, training writes five independent metric/plot sets under `models/dvclive/cv-1/` through `models/dvclive/cv-5/`. Evaluation writes the overall holdout metrics under `reports/evaluation/dvclive/`, giving DVC six independently tracked metric files: five fold runs and one overall run.
 
 ## Data Modules

@@ -18,7 +18,13 @@ from dvclive import Live
 from sklearn.pipeline import Pipeline
 from sklearn.inspection import PartialDependenceDisplay
 from pipeline.data.utils import load_labeled_data
-from pipeline.model.utils import load_run_identity, log_metrics, regression_metrics, save_figure
+from pipeline.model.utils import (
+	load_run_identity,
+	log_metrics,
+	log_pipeline_configuration,
+	regression_metrics,
+	save_figure,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -275,6 +281,7 @@ def build_parser() -> ArgumentParser:
 	parser.add_argument("--input-csv", type=Path, required=True, help="Raw holdout CSV file.")
 	parser.add_argument("--model-path", type=Path, required=True, help="Composite model joblib file.")
 	parser.add_argument("--parent-run-info", type=Path, required=True, help="Training run metadata used to resume the MLflow parent.")
+	parser.add_argument("--params-file", type=Path, default="configs/params.yaml", help="Pipeline parameter YAML.")
 	parser.add_argument("--output-dir", type=Path, required=True, help="Directory for metrics, plots, and report.")
 	parser.add_argument("--target-column", default="price", help="Regression target column.")
 	parser.add_argument("--experiment-name", default="property-price-models", help="MLflow experiment name.")
@@ -298,6 +305,7 @@ def main() -> None:
 	mlflow.set_experiment(args.experiment_name)
 	plot_paths: list[Path] = []
 	with mlflow.start_run(run_id=run_identity["mlflow_run_id"]):
+		log_pipeline_configuration(args.params_file)
 		mlflow.log_params({"target_column": args.target_column, "holdout_rows": len(y)})
 		with Live(
 			dir=str(args.output_dir / "dvclive"),

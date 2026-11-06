@@ -84,7 +84,7 @@ stages:
       data/features/featurizer.joblib --output-dir models --config 
       configs/model.yaml --target-column price --experiment-name 
       property-price-models --cv-type kfold --cv-splits 5 --cv-repeats 1 
-      --cv-random-state 37
+      --cv-random-state 37 --params-file configs/params.yaml
     deps:
     - path: configs/model.yaml
       hash: md5
@@ -108,12 +108,12 @@ stages:
       size: 1467
     - path: pipeline/model/train.py
       hash: md5
-      md5: 2a099b7522449628a137bc0a065f5cca
-      size: 12145
+      md5: 0374ae8373e5b302344320eefb1fbe68
+      size: 12451
     - path: pipeline/model/utils.py
       hash: md5
-      md5: 411c016b970c3d9716a4494a6705b7d1
-      size: 3065
+      md5: 3c3f225eda73ac67f040bc52fc5c6762
+      size: 4633
     params:
       configs/params.yaml:
         experiment-name: property-price-models
@@ -185,13 +185,13 @@ stages:
       nfiles: 3
     - path: models/run_info.json
       hash: md5
-      md5: c61de8592fbbc968d8657838c7b9b17d
+      md5: 417208b5b5ad369f54a43a73e7c2fafa
       size: 237
   evaluate:
     cmd: uv run python -m pipeline.model.evaluate --input-csv 
       data/processed/test.csv --model-path models/model.joblib --parent-run-info
       models/run_info.json --output-dir reports/evaluation --target-column price
-      --experiment-name property-price-models
+      --experiment-name property-price-models --params-file configs/params.yaml
     deps:
     - path: data/processed/test.csv
       hash: md5
@@ -203,7 +203,7 @@ stages:
       size: 21912497
     - path: models/run_info.json
       hash: md5
-      md5: c61de8592fbbc968d8657838c7b9b17d
+      md5: 417208b5b5ad369f54a43a73e7c2fafa
       size: 237
     - path: pipeline/data/utils.py
       hash: md5
@@ -211,12 +211,12 @@ stages:
       size: 1467
     - path: pipeline/model/evaluate.py
       hash: md5
-      md5: 43c28d506dbc32360c532ec8d5464a47
-      size: 13392
+      md5: c8f76a6653ca99b02f2c58d8d80a02d0
+      size: 13590
     - path: pipeline/model/utils.py
       hash: md5
-      md5: 411c016b970c3d9716a4494a6705b7d1
-      size: 3065
+      md5: 3c3f225eda73ac67f040bc52fc5c6762
+      size: 4633
     params:
       configs/params.yaml:
         evaluate.output: reports/evaluation
@@ -233,12 +233,12 @@ stages:
       size: 227
     - path: reports/evaluation/evaluation_report.html
       hash: md5
-      md5: 6153c8ae081726f70ab2b6ec64aa01e8
-      size: 848377
+      md5: ea6b67ae9eec9de99685e5cef398acf5
+      size: 848277
     - path: reports/evaluation/plots
       hash: md5
-      md5: cab829f562daa7599f13098ede994dcb.dir
-      size: 634055
+      md5: 037bd2ca1f131eb9de104651f5d2221c.dir
+      size: 633981
       nfiles: 7
     - path: reports/evaluation/predictions.csv
       hash: md5

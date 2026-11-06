@@ -55,6 +55,7 @@ stages:
       --experiment-name ${experiment-name} --cv-type ${train.cv-type}
       --cv-splits ${train.cv-splits} --cv-repeats ${train.cv-repeats}
       --cv-random-state ${train.cv-random-state}
+      --params-file configs/params.yaml
     deps:
     - ${featurize.output}/features.csv
     - ${prepare.output}/preprocessor.joblib
@@ -111,7 +112,7 @@ stages:
       ${prepare.output}/test.csv --model-path ${train.output}/model.joblib
       --parent-run-info ${train.output}/run_info.json
       --output-dir ${evaluate.output} --target-column ${target-column}
-      --experiment-name ${experiment-name}
+      --experiment-name ${experiment-name} --params-file configs/params.yaml
     deps:
     - ${prepare.output}/test.csv
     - ${train.output}/model.joblib

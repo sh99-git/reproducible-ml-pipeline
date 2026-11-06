@@ -22,6 +22,7 @@ from pipeline.model.utils import (
     create_run_identity,
     cv_run_name,
     log_metrics,
+    log_pipeline_configuration,
     regression_metrics,
     save_figure,
     save_run_identity,
@@ -67,6 +68,7 @@ def cross_validate(
     cv: BaseCrossValidator,
     run_identity: dict[str, str],
     dvclive_dir: Path,
+    params_path: Path,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fit isolated fold models and collect metrics and out-of-fold predictions."""
     fold_metrics: list[dict[str, float]] = []
@@ -93,6 +95,7 @@ def cross_validate(
         prediction_frames.append(fold_predictions)
         child_run_name = cv_run_name(run_identity, fold)
         with mlflow.start_run(nested=True, run_name=child_run_name):
+            log_pipeline_configuration(params_path)
             with Live(
                 dir=str(dvclive_dir / f"cv-{fold}"),
                 exp_name=child_run_name,
@@ -229,6 +232,7 @@ def build_parser() -> ArgumentParser:
     parser.add_argument("--featurizer-path", type=Path, required=True, help="Fitted feature engineering artifact.")
     parser.add_argument("--target-column", default="price", help="Regression target column.")
     parser.add_argument("--experiment-name", default="property-price-models", help="MLflow experiment name.")
+    parser.add_argument("--params-file", type=Path, default="configs/params.yaml", help="Pipeline parameter YAML.")
     parser.add_argument("--cv-type", choices=["kfold", "shuffle", "repeated"], default="kfold")
     parser.add_argument("--cv-splits", type=int, default=5)
     parser.add_argument("--cv-repeats", type=int, default=1)
@@ -261,6 +265,7 @@ def main() -> None:
             "cv_random_state": args.cv_random_state,
             "model_config": str(args.config),
         })
+        log_pipeline_configuration(args.params_file)
         cv_metrics, cv_predictions = cross_validate(
             model_template,
             X,
@@ -268,6 +273,7 @@ def main() -> None:
             build_cv(args),
             run_identity,
             args.output_dir / "dvclive",
+            args.params_file,
         )
         summary = summarize_cv_metrics(cv_metrics, args.cv_type)
         save_cv_results(args.output_dir, cv_metrics, cv_predictions, summary)
