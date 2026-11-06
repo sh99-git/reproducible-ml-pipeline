@@ -72,23 +72,50 @@ stages:
       - experiment-name
     outs:
     - ${train.output}/model.joblib
-    - ${train.output}/plots
-    - ${train.output}/dvclive
-    metrics:
+    - ${train.output}/run_info.json
     - ${train.output}/metrics.json
+    - ${train.output}/plots
+    metrics:
+    - ${train.output}/dvclive/cv-1/metrics.json
+    - ${train.output}/dvclive/cv-2/metrics.json
+    - ${train.output}/dvclive/cv-3/metrics.json
+    - ${train.output}/dvclive/cv-4/metrics.json
+    - ${train.output}/dvclive/cv-5/metrics.json
     plots:
     - ${train.output}/cv_metrics.csv
     - ${train.output}/cv_predictions.csv
+    - ${train.output}/dvclive/cv-1/plots/custom/valid_predictions.json:
+        template: scatter
+        x: actual
+        y: predicted
+    - ${train.output}/dvclive/cv-2/plots/custom/valid_predictions.json:
+        template: scatter
+        x: actual
+        y: predicted
+    - ${train.output}/dvclive/cv-3/plots/custom/valid_predictions.json:
+        template: scatter
+        x: actual
+        y: predicted
+    - ${train.output}/dvclive/cv-4/plots/custom/valid_predictions.json:
+        template: scatter
+        x: actual
+        y: predicted
+    - ${train.output}/dvclive/cv-5/plots/custom/valid_predictions.json:
+        template: scatter
+        x: actual
+        y: predicted
 
   evaluate:
     cmd: >-
       uv run python -m pipeline.model.evaluate --input-csv
       ${prepare.output}/test.csv --model-path ${train.output}/model.joblib
+      --parent-run-info ${train.output}/run_info.json
       --output-dir ${evaluate.output} --target-column ${target-column}
       --experiment-name ${experiment-name}
     deps:
     - ${prepare.output}/test.csv
     - ${train.output}/model.joblib
+    - ${train.output}/run_info.json
     - pipeline/model/evaluate.py
     - pipeline/model/utils.py
     - pipeline/data/utils.py
@@ -100,9 +127,9 @@ stages:
     outs:
     - ${evaluate.output}/evaluation_report.html
     - ${evaluate.output}/plots
-    - ${evaluate.output}/dvclive
-    metrics:
     - ${evaluate.output}/evaluation_metrics.json
+    metrics:
+    - ${evaluate.output}/dvclive/metrics.json
     plots:
     - ${evaluate.output}/predictions.csv
 

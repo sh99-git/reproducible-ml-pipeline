@@ -1,0 +1,25 @@
+input-path: data/raw
+target-column: price
+task: regression
+experiment-name: property-price-models
+prepare:
+  output: data/processed
+  random-state: 42
+  test-size: 0.2
+  config: configs/preprocess.yaml
+featurize:
+  output: data/features
+  config: configs/featurizer.yaml
+  noise-level: 0.1
+  noise-type: gaussian
+  noise-state: 57
+  noise-fraction: 0.25
+train:
+  output: models
+  config: configs/model.yaml
+  cv-type: kfold
+  cv-splits: 5
+  cv-repeats: 1
+  cv-random-state: 37
+evaluate:
+  output: reports/evaluation

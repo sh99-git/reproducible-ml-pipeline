@@ -1,6 +1,9 @@
 """Shared helpers for model training and evaluation stages."""
 
+import json
+from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 import matplotlib
 matplotlib.use("Agg")
@@ -39,13 +42,48 @@ def log_metrics(metrics: dict[str, float | int], live: Live | None = None) -> No
             live.log_metric(name, value)
 
 
-def save_figure(figure: Figure, name: str, output_dir: Path, live: Live) -> Path:
+def create_run_identity(experiment_name: str) -> dict[str, str]:
+    """Build a unique, readable parent run name from the configured base name."""
+    timestamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
+    unique_id = uuid4().hex[:8]
+    return {
+        "experiment_name": experiment_name,
+        "timestamp": timestamp,
+        "unique_id": unique_id,
+        "run_name": f"{experiment_name}-training-{timestamp}-{unique_id}",
+    }
+
+
+def cv_run_name(run_identity: dict[str, str], fold: int) -> str:
+    """Append a fold suffix while retaining the parent timestamp and ID."""
+    return f"{run_identity['run_name']}-cv-{fold}"
+
+
+def save_run_identity(path: Path, run_identity: dict[str, str], run_id: str) -> None:
+    """Persist the MLflow parent ID and naming metadata for evaluation to resume."""
+    metadata = {**run_identity, "mlflow_run_id": run_id}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+
+def load_run_identity(path: Path) -> dict[str, str]:
+    """Load the parent run metadata created by the training stage."""
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def save_figure(
+    figure: Figure,
+    name: str,
+    output_dir: Path,
+    live: Live | None = None,
+) -> Path:
     """Save a plot locally and register the same image with MLflow and DVCLive."""
     path = output_dir / "plots" / f"{name}.png"
     path.parent.mkdir(parents=True, exist_ok=True)
     figure.tight_layout()
     figure.savefig(path, dpi=150, bbox_inches="tight")
     mlflow.log_artifact(str(path), artifact_path="plots")
-    live.log_image(name, str(path))
+    if live is not None:
+        live.log_image(name, str(path))
     plt.close(figure)
     return path

@@ -108,12 +108,12 @@ stages:
       size: 1467
     - path: pipeline/model/train.py
       hash: md5
-      md5: 9ea65fc5b7766326bb949df02a9df73f
-      size: 10655
+      md5: 2a099b7522449628a137bc0a065f5cca
+      size: 12145
     - path: pipeline/model/utils.py
       hash: md5
-      md5: 2b7691220ae6d3cbe0719b8719a4c345
-      size: 1759
+      md5: 411c016b970c3d9716a4494a6705b7d1
+      size: 3065
     params:
       configs/params.yaml:
         experiment-name: property-price-models
@@ -130,11 +130,46 @@ stages:
       hash: md5
       md5: ff60dcf940d1e184ff086b966fe05e57
       size: 38749
-    - path: models/dvclive
+    - path: models/dvclive/cv-1/metrics.json
       hash: md5
-      md5: e7ab242f8c66fc6aa960623b2e127d38.dir
-      size: 560380
-      nfiles: 23
+      md5: c5c39fbda9517fbb782b5fd8149543e4
+      size: 296
+    - path: models/dvclive/cv-1/plots/custom/valid_predictions.json
+      hash: md5
+      md5: 94b7dd521f7824ce2b31fd0fcdcad533
+      size: 29589
+    - path: models/dvclive/cv-2/metrics.json
+      hash: md5
+      md5: b67579a94bbbe81692771ef5716ccab1
+      size: 295
+    - path: models/dvclive/cv-2/plots/custom/valid_predictions.json
+      hash: md5
+      md5: 616cd4695819437f945404b0cb8ef893
+      size: 29576
+    - path: models/dvclive/cv-3/metrics.json
+      hash: md5
+      md5: 0362c6a2f76baf609ce9a65f0170b45f
+      size: 294
+    - path: models/dvclive/cv-3/plots/custom/valid_predictions.json
+      hash: md5
+      md5: 6043a2d8b46d0b6f83bb8c5ee30df344
+      size: 29585
+    - path: models/dvclive/cv-4/metrics.json
+      hash: md5
+      md5: 70682ea6cc8b8c62c337caba6ddb8b02
+      size: 285
+    - path: models/dvclive/cv-4/plots/custom/valid_predictions.json
+      hash: md5
+      md5: 0b4d6a08b09c7a4c283c1a3ba4192346
+      size: 29601
+    - path: models/dvclive/cv-5/metrics.json
+      hash: md5
+      md5: 4dbe241d8072c3dfbcc5df327604aa67
+      size: 294
+    - path: models/dvclive/cv-5/plots/custom/valid_predictions.json
+      hash: md5
+      md5: 423d9e96ea9f0bb97276030156cac716
+      size: 29582
     - path: models/metrics.json
       hash: md5
       md5: 942e6213f26c0e48d7eebb3b122a3c55
@@ -148,11 +183,15 @@ stages:
       md5: 15b39715b1b80bb0649f4d4ba4803c27.dir
       size: 261621
       nfiles: 3
+    - path: models/run_info.json
+      hash: md5
+      md5: c61de8592fbbc968d8657838c7b9b17d
+      size: 237
   evaluate:
     cmd: uv run python -m pipeline.model.evaluate --input-csv 
-      data/processed/test.csv --model-path models/model.joblib --output-dir 
-      reports/evaluation --target-column price --experiment-name 
-      property-price-models
+      data/processed/test.csv --model-path models/model.joblib --parent-run-info
+      models/run_info.json --output-dir reports/evaluation --target-column price
+      --experiment-name property-price-models
     deps:
     - path: data/processed/test.csv
       hash: md5
@@ -162,41 +201,44 @@ stages:
       hash: md5
       md5: a6b2182f3274b2ea339eadc15469bf76
       size: 21912497
+    - path: models/run_info.json
+      hash: md5
+      md5: c61de8592fbbc968d8657838c7b9b17d
+      size: 237
     - path: pipeline/data/utils.py
       hash: md5
       md5: e48bea05d659b83b08f731ca29a5bb72
       size: 1467
     - path: pipeline/model/evaluate.py
       hash: md5
-      md5: 6ce9df3815307ec6055383aa0fe28c1e
-      size: 12988
+      md5: 43c28d506dbc32360c532ec8d5464a47
+      size: 13392
     - path: pipeline/model/utils.py
       hash: md5
-      md5: 2b7691220ae6d3cbe0719b8719a4c345
-      size: 1759
+      md5: 411c016b970c3d9716a4494a6705b7d1
+      size: 3065
     params:
       configs/params.yaml:
         evaluate.output: reports/evaluation
         experiment-name: property-price-models
         target-column: price
     outs:
-    - path: reports/evaluation/dvclive
+    - path: reports/evaluation/dvclive/metrics.json
       hash: md5
-      md5: da0a2d3fe8236c4781fa1a77fa5869c1.dir
-      size: 718795
-      nfiles: 17
+      md5: 0d89636e093ea13629ca7087267d80c8
+      size: 216
     - path: reports/evaluation/evaluation_metrics.json
       hash: md5
       md5: 7b2630483aec6357b0481a6d311a550c
       size: 227
     - path: reports/evaluation/evaluation_report.html
       hash: md5
-      md5: 353eaf1eab4850f0be68f938042cf87b
-      size: 848901
+      md5: 6153c8ae081726f70ab2b6ec64aa01e8
+      size: 848377
     - path: reports/evaluation/plots
       hash: md5
-      md5: 70e2fa8ce0f8f5f2bcb656c9b9966a3d.dir
-      size: 634448
+      md5: cab829f562daa7599f13098ede994dcb.dir
+      size: 634055
       nfiles: 7
     - path: reports/evaluation/predictions.csv
       hash: md5

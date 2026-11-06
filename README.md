@@ -21,12 +21,18 @@ MLFLOW_TRACKING_URI=sqlite:///mlflow.db uv run mlflow ui --backend-store-uri sql
 
 ## Configuration
 
-- `configs/params.yaml` contains paths, target selection, split settings, feature-noise options, experiment name, and cross-validation settings consumed by DVC.
+- `configs/params.yaml` is tracked directly in Git for readable diffs. DVC uses the parameter declarations in `dvc.yaml` to track the values used by each stage and rerun only affected stages and their downstream dependents.
 - `configs/preprocess.yaml` configures raw-column transformations.
 - `configs/featurizer.yaml` configures property-specific feature engineering.
 - `configs/model.yaml` defines the scikit-learn estimator pipeline.
 
 Change these files before running DVC so stage parameters and dependencies are recorded in the lockfile.
+
+## Experiment Runs
+
+`experiment-name` in `configs/params.yaml` is the MLflow experiment and run-name base. Each training invocation creates a parent run named `<base>-training-<timestamp>-<id>`. Cross-validation runs are nested children named with the same parent identity and a `-cv-N` suffix. The training stage saves the parent run ID and naming metadata to `models/run_info.json`; evaluation resumes that run and adds holdout metrics and report artifacts to the parent.
+
+DVCLive does not use MLflow-style nested runs here. With the configured five folds, training writes five independent metric/plot sets under `models/dvclive/cv-1/` through `models/dvclive/cv-5/`. Evaluation writes the overall holdout metrics under `reports/evaluation/dvclive/`, giving DVC six independently tracked metric files: five fold runs and one overall run.
 
 ## Data Modules
 
@@ -40,7 +46,7 @@ Change these files before running DVC so stage parameters and dependencies are r
 | --- | --- |
 | `data/processed/` | Prepared training and holdout CSVs plus the fitted preprocessor. |
 | `data/features/` | Featurized training data and fitted feature engineer. |
-| `models/` | Composite `model.joblib`, cross-validation metrics and predictions, plots, and DVCLive logs. |
+| `models/` | Composite `model.joblib`, parent `run_info.json`, cross-validation metrics and predictions, plots, and per-fold DVCLive logs. |
 | `reports/evaluation/` | Holdout metrics, per-row predictions, plots, DVCLive logs, and `evaluation_report.html`. |
 
 The saved composite model accepts raw property rows and applies the fitted preprocessor and feature engineer before prediction. Training uses the featurized training CSV; evaluation uses the untouched raw holdout CSV.

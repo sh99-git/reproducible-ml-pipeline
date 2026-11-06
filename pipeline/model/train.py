@@ -18,7 +18,14 @@ from dvclive import Live
 from omegaconf import OmegaConf
 from hydra.utils import instantiate
 from pipeline.data.utils import load_labeled_data
-from pipeline.model.utils import log_metrics, regression_metrics, save_figure
+from pipeline.model.utils import (
+    create_run_identity,
+    cv_run_name,
+    log_metrics,
+    regression_metrics,
+    save_figure,
+    save_run_identity,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +65,8 @@ def cross_validate(
     X: pd.DataFrame,
     y: pd.Series,
     cv: BaseCrossValidator,
+    run_identity: dict[str, str],
+    dvclive_dir: Path,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fit isolated fold models and collect metrics and out-of-fold predictions."""
     fold_metrics: list[dict[str, float]] = []
@@ -75,14 +84,32 @@ def cross_validate(
             "fold": float(fold),
         }
         fold_metrics.append(metrics)
-        prediction_frames.append(pd.DataFrame({
+        fold_predictions = pd.DataFrame({
             "fold": fold,
             "actual": y_valid.to_numpy(),
             "predicted": valid_predictions,
             "residual": y_valid.to_numpy() - valid_predictions,
-        }))
-        with mlflow.start_run(nested=True, run_name=f"fold-{fold}"):
-            mlflow.log_metrics({name: value for name, value in metrics.items() if name != "fold"})
+        })
+        prediction_frames.append(fold_predictions)
+        child_run_name = cv_run_name(run_identity, fold)
+        with mlflow.start_run(nested=True, run_name=child_run_name):
+            with Live(
+                dir=str(dvclive_dir / f"cv-{fold}"),
+                exp_name=child_run_name,
+                save_dvc_exp=False,
+                dvcyaml=False,
+            ) as live:
+                log_metrics({name: value for name, value in metrics.items() if name != "fold"}, live)
+                live.log_plot(
+                    "valid_predictions", fold_predictions, x="actual", y="predicted",
+                    template="scatter", title=f"CV {fold}: predicted vs actual",
+                    x_label="Actual", y_label="Predicted",
+                )
+                live.log_plot(
+                    "valid_residuals", fold_predictions, x="predicted", y="residual",
+                    template="scatter", title=f"CV {fold}: residuals vs predicted",
+                    x_label="Predicted", y_label="Residual",
+                )
 
     return pd.DataFrame(fold_metrics), pd.concat(prediction_frames, ignore_index=True)
 
@@ -120,22 +147,23 @@ def log_cv_plots(
     cv_metrics: pd.DataFrame,
     cv_predictions: pd.DataFrame,
     output_dir: Path,
-    live: Live,
+    live: Live | None = None,
 ) -> None:
     """Log fold metrics, prediction scatter, and residual diagnostics."""
-    live.log_plot(
-        "cv_metrics", cv_metrics, x="fold", y=["valid_rmse", "valid_mae", "valid_r2"],
-        template="linear", title="Cross-validation metrics by fold",
-        x_label="Fold", y_label="Score",
-    )
-    live.log_plot(
-        "cv_predictions", cv_predictions, x="actual", y="predicted", template="scatter",
-        title="Cross-validation predictions", x_label="Actual", y_label="Predicted",
-    )
-    live.log_plot(
-        "cv_residuals", cv_predictions, x="predicted", y="residual", template="scatter",
-        title="Cross-validation residuals", x_label="Predicted", y_label="Residual",
-    )
+    if live is not None:
+        live.log_plot(
+            "cv_metrics", cv_metrics, x="fold", y=["valid_rmse", "valid_mae", "valid_r2"],
+            template="linear", title="Cross-validation metrics by fold",
+            x_label="Fold", y_label="Score",
+        )
+        live.log_plot(
+            "cv_predictions", cv_predictions, x="actual", y="predicted", template="scatter",
+            title="Cross-validation predictions", x_label="Actual", y_label="Predicted",
+        )
+        live.log_plot(
+            "cv_residuals", cv_predictions, x="predicted", y="residual", template="scatter",
+            title="Cross-validation residuals", x_label="Predicted", y_label="Residual",
+        )
 
     figure, axis = plt.subplots(figsize=(8, 5))
     cv_metrics[["train_rmse", "valid_rmse"]].plot(kind="box", ax=axis)
@@ -176,7 +204,7 @@ def log_feature_importance(
     model: Pipeline,
     X: pd.DataFrame,
     output_dir: Path,
-    live: Live,
+    live: Live | None = None,
 ) -> None:
     """Log a feature-importance plot when the estimator exposes importances."""
     estimator = model.steps[-1][1]
@@ -219,41 +247,47 @@ def main() -> None:
     mlflow.set_experiment(args.experiment_name)
     logger.info("Evaluating the model with %s cross-validation", args.cv_type)
 
-    with mlflow.start_run(run_name="model-training"):
+    run_identity = create_run_identity(args.experiment_name)
+    run_info_path = args.output_dir / "run_info.json"
+    with mlflow.start_run(run_name=run_identity["run_name"]) as parent_run:
+        run_identity["mlflow_run_id"] = parent_run.info.run_id
         mlflow.log_params({
+            "experiment_base": args.experiment_name,
+            "run_timestamp": run_identity["timestamp"],
+            "run_identifier": run_identity["unique_id"],
             "cv_type": args.cv_type,
             "cv_splits": args.cv_splits,
             "cv_repeats": args.cv_repeats,
             "cv_random_state": args.cv_random_state,
             "model_config": str(args.config),
         })
-        with Live(
-            dir=str(args.output_dir / "dvclive"),
-            save_dvc_exp=False,
-            dvcyaml=False,
-        ) as live:
-            cv_metrics, cv_predictions = cross_validate(
-                model_template, X, y, build_cv(args)
-            )
+        cv_metrics, cv_predictions = cross_validate(
+            model_template,
+            X,
+            y,
+            build_cv(args),
+            run_identity,
+            args.output_dir / "dvclive",
+        )
+        summary = summarize_cv_metrics(cv_metrics, args.cv_type)
+        save_cv_results(args.output_dir, cv_metrics, cv_predictions, summary)
+        for metric, values in summary["metrics"].items():
+            log_metrics({f"cv_{metric}_mean": values["mean"], f"cv_{metric}_std": values["std"]})
+        log_cv_plots(cv_metrics, cv_predictions, args.output_dir)
 
-            summary = summarize_cv_metrics(cv_metrics, args.cv_type)
-            save_cv_results(args.output_dir, cv_metrics, cv_predictions, summary)
-
-            for metric, values in summary["metrics"].items():
-                log_metrics({f"cv_{metric}_mean": values["mean"], f"cv_{metric}_std": values["std"]}, live)
-            log_cv_plots(cv_metrics, cv_predictions, args.output_dir, live)
-
-            composite_model = fit_composite_model(
-                model_template,
-                X,
-                y,
-                args.preprocessor_path,
-                args.featurizer_path,
-            )
-            model_path = args.output_dir / "model.joblib"
-            joblib.dump(composite_model, model_path)
-            mlflow.log_artifact(str(model_path), artifact_path="model")
-            log_feature_importance(composite_model.steps[-1][1], X, args.output_dir, live)
+        composite_model = fit_composite_model(
+            model_template,
+            X,
+            y,
+            args.preprocessor_path,
+            args.featurizer_path,
+        )
+        model_path = args.output_dir / "model.joblib"
+        joblib.dump(composite_model, model_path)
+        mlflow.log_artifact(str(model_path), artifact_path="model")
+        log_feature_importance(composite_model.steps[-1][1], X, args.output_dir)
+        save_run_identity(run_info_path, run_identity, parent_run.info.run_id)
+        mlflow.log_artifact(str(run_info_path), artifact_path="metadata")
 
     logger.info("Saved composite model and CV metrics to %s", args.output_dir)
 
