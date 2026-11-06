@@ -30,6 +30,11 @@ from pipeline.model.utils import (
 
 
 logger = logging.getLogger(__name__)
+SKOPS_TRUSTED_TYPES = [
+    "pipeline.data.featurize.PropertyFeatureEngineer",
+    "skext.multilabels.MultiLabelBinarizerTransformer",
+    "sklearn.tree._tree.Tree",
+]
 
 
 def build_cv(args: Namespace) -> BaseCrossValidator:
@@ -69,6 +74,8 @@ def cross_validate(
     run_identity: dict[str, str],
     dvclive_dir: Path,
     params_path: Path,
+    featurizer_path: Path,
+    preprocessor_path: Path,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fit isolated fold models and collect metrics and out-of-fold predictions."""
     fold_metrics: list[dict[str, float]] = []
@@ -113,6 +120,17 @@ def cross_validate(
                     template="scatter", title=f"CV {fold}: residuals vs predicted",
                     x_label="Predicted", y_label="Residual",
                 )
+            cv_pipeline = Pipeline([
+                ("preprocessor", joblib.load(preprocessor_path)),
+                ("featurizer", joblib.load(featurizer_path)),
+                ("model", fold_model),
+            ])
+            mlflow.sklearn.log_model(
+                cv_pipeline,
+                artifact_path=f"cv-{fold}-model",
+                registered_model_name=None,
+                skops_trusted_types=SKOPS_TRUSTED_TYPES,
+            )
 
     return pd.DataFrame(fold_metrics), pd.concat(prediction_frames, ignore_index=True)
 
@@ -274,6 +292,8 @@ def main() -> None:
             run_identity,
             args.output_dir / "dvclive",
             args.params_file,
+            args.featurizer_path,
+            args.preprocessor_path,
         )
         summary = summarize_cv_metrics(cv_metrics, args.cv_type)
         save_cv_results(args.output_dir, cv_metrics, cv_predictions, summary)
@@ -294,6 +314,11 @@ def main() -> None:
         log_feature_importance(composite_model.steps[-1][1], X, args.output_dir)
         save_run_identity(run_info_path, run_identity, parent_run.info.run_id)
         mlflow.log_artifact(str(run_info_path), artifact_path="metadata")
+        mlflow.sklearn.log_model(
+            composite_model,
+            artifact_path="final-model",
+            skops_trusted_types=SKOPS_TRUSTED_TYPES,
+        )
 
     logger.info("Saved composite model and CV metrics to %s", args.output_dir)
 

@@ -20,6 +20,6 @@ train:
   cv-type: kfold
   cv-splits: 5
   cv-repeats: 1
-  cv-random-state: 37
+  cv-random-state: 93
 evaluate:
   output: reports/evaluation
