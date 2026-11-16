@@ -4,14 +4,14 @@ task: regression
 experiment-name: property-price-models
 prepare:
   output: data/processed
-  random-state: 13
-  test-size: 0.25
+  random-state: 11
+  test-size: 0.2
   config: configs/preprocess.yaml
 featurize:
   output: data/features
   config: configs/featurizer.yaml
   noise:
-    level: 0.1
+    level: 0.2
     type: gaussian
     state: 57
     fraction: 0.2
