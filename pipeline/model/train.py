@@ -70,6 +70,7 @@ def cross_validate(
     model_template: Pipeline,
     X: pd.DataFrame,
     y: pd.Series,
+    input_example: pd.DataFrame,
     cv: BaseCrossValidator,
     run_identity: dict[str, str],
     dvclive_dir: Path,
@@ -125,11 +126,19 @@ def cross_validate(
                 ("featurizer", joblib.load(featurizer_path)),
                 ("model", fold_model),
             ])
+            signature = mlflow.models.infer_signature(
+                input_example,
+                cv_pipeline.predict(input_example),
+            )
             mlflow.sklearn.log_model(
                 cv_pipeline,
                 artifact_path=f"cv-{fold}-model",
                 registered_model_name=None,
+                signature=signature,
+                input_example=input_example,
                 skops_trusted_types=SKOPS_TRUSTED_TYPES,
+                serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
+                code_paths=["pipeline"]
             )
 
     return pd.DataFrame(fold_metrics), pd.concat(prediction_frames, ignore_index=True)
@@ -264,6 +273,11 @@ def main() -> None:
     args = build_parser().parse_args()
 
     X, y = load_labeled_data(args.input_csv, args.target_column)
+    input_example, _ = load_labeled_data(
+        args.preprocessor_path.parent / "test.csv",
+        args.target_column,
+    )
+    input_example = input_example.head(5)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     model_template = load_model_template(args.config)
     mlflow.set_experiment(args.experiment_name)
@@ -283,6 +297,7 @@ def main() -> None:
             model_template,
             X,
             y,
+            input_example,
             build_cv(args),
             run_identity,
             args.output_dir / "dvclive",
@@ -312,6 +327,11 @@ def main() -> None:
         mlflow.sklearn.log_model(
             composite_model,
             artifact_path="final-model",
+            signature=mlflow.models.infer_signature(
+                input_example,
+                composite_model.predict(input_example),
+            ),
+            input_example=input_example,
             skops_trusted_types=SKOPS_TRUSTED_TYPES,
             serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
             code_paths=["pipeline"]
