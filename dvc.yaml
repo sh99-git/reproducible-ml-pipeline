@@ -27,9 +27,9 @@ stages:
       uv run python -m pipeline.data.featurize --input-csv
       ${prepare.output}/train.csv --output-dir ${featurize.output} --config
       ${featurize.config} --target-column ${target-column} --noise-level
-      ${featurize.noise-level} --noise-type ${featurize.noise-type}
-      --noise-state ${featurize.noise-state} --noise-fraction
-      ${featurize.noise-fraction}
+      ${featurize.noise.level} --noise-type ${featurize.noise.type}
+      --noise-state ${featurize.noise.state} --noise-fraction
+      ${featurize.noise.fraction}
     deps:
     - ${prepare.output}/train.csv
     - ${featurize.config}
@@ -37,10 +37,10 @@ stages:
     - pipeline/data/utils.py
     params:
     - configs/params.yaml:
-      - featurize.noise-level
-      - featurize.noise-type
-      - featurize.noise-state
-      - featurize.noise-fraction
+      - featurize.noise.level
+      - featurize.noise.type
+      - featurize.noise.state
+      - featurize.noise.fraction
     outs:
     - ${featurize.output}/features.csv
     - ${featurize.output}/featurizer.joblib
@@ -52,9 +52,9 @@ stages:
       ${prepare.output}/preprocessor.joblib --featurizer-path
       ${featurize.output}/featurizer.joblib --output-dir ${train.output}
       --config ${train.config} --target-column ${target-column}
-      --experiment-name ${experiment-name} --cv-type ${train.cv-type}
-      --cv-splits ${train.cv-splits} --cv-repeats ${train.cv-repeats}
-      --cv-random-state ${train.cv-random-state}
+      --experiment-name ${experiment-name} --cv-type ${train.cv.type}
+      --cv-splits ${train.cv.splits} --cv-repeats ${train.cv.repeats}
+      --cv-random-state ${train.cv.state}
       --params-file configs/params.yaml
     deps:
     - ${featurize.output}/features.csv
@@ -66,10 +66,10 @@ stages:
     - pipeline/data/utils.py
     params:
     - configs/params.yaml:
-      - train.cv-type
-      - train.cv-splits
-      - train.cv-repeats
-      - train.cv-random-state
+      - train.cv.type
+      - train.cv.splits
+      - train.cv.repeats
+      - train.cv.state
       - experiment-name
     outs:
     - ${train.output}/model.joblib

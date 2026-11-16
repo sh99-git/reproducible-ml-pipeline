@@ -276,12 +276,7 @@ def main() -> None:
         mlflow.log_params({
             "experiment_base": args.experiment_name,
             "run_timestamp": run_identity["timestamp"],
-            "run_identifier": run_identity["unique_id"],
-            "cv_type": args.cv_type,
-            "cv_splits": args.cv_splits,
-            "cv_repeats": args.cv_repeats,
-            "cv_random_state": args.cv_random_state,
-            "model_config": str(args.config),
+            "run_identifier": run_identity["unique_id"]
         })
         log_pipeline_configuration(args.params_file)
         cv_metrics, cv_predictions = cross_validate(

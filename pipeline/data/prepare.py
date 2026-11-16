@@ -25,11 +25,6 @@ def build_parser() -> ArgumentParser:
     return parser
 
 
-def split_data(data: pd.DataFrame, test_size: float, random_state: int) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Create reproducible training and untouched holdout frames."""
-    return train_test_split(data, test_size=test_size, random_state=random_state)
-
-
 def load_preprocessor(config_path: Path):
     """Instantiate the preprocessing transformer from its Hydra config."""
     preprocessor = instantiate(OmegaConf.load(config_path), _convert_="all")
@@ -76,7 +71,7 @@ def main():
     df = load_csv_directory(args.input_dir)
     logger.info("Loaded %d rows and %d columns", *df.shape)
     logger.info("Splitting data with test_size=%s and random_state=%s", args.test_size, args.random_state)
-    train_df, test_df = split_data(df, args.test_size, args.random_state)
+    train_df, test_df = train_test_split(df, test_size=args.test_size, random_state=args.random_state)
     logger.info("Loading preprocessing configuration from %s", args.config)
     preprocessor = load_preprocessor(args.config)
     logger.info("Fitting preprocessor and transforming training data")
