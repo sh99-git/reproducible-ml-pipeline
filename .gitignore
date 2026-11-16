@@ -138,7 +138,6 @@ cython_debug/
 #  DVC is a data version control system. `.dvcignore` specifies files/directories to
 #  exclude from DVC tracking. Recommended for sensitive data refer to https://dvc.org/doc/user-guide/dvcignore
 .dvcignore
-.dvc/
 
 # uv
 uv.lock
