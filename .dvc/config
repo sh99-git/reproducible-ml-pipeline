@@ -1,0 +1,4 @@
+[core]
+    remote = reproml
+['remote "reproml"']
+    url = /data/sh99/datastore/reproml
