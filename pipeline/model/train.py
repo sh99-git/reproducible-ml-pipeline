@@ -313,6 +313,7 @@ def main() -> None:
             composite_model,
             artifact_path="final-model",
             skops_trusted_types=SKOPS_TRUSTED_TYPES,
+            serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE,
         )
 
     logger.info("Saved composite model and CV metrics to %s", args.output_dir)

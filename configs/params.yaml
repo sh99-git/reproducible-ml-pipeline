@@ -5,7 +5,7 @@ experiment-name: property-price-models
 prepare:
   output: data/processed
   random-state: 13
-  test-size: 0.2
+  test-size: 0.25
   config: configs/preprocess.yaml
 featurize:
   output: data/features
